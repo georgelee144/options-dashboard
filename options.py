@@ -105,6 +105,29 @@ fig = px.line(df, x="x", y="y")
 fig.update_xaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
 fig.update_yaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
 
+
+def html_div(
+    label_name,
+    default_val,
+    val_type,
+    id,
+    step="any",
+    style={"display": "inline-block", "flex-wrap": "wrap"},
+):
+    return html.Div(
+        [
+            html.Label(label_name),
+            dcc.Input(
+                value=default_val,
+                type=val_type,
+                id=id,
+                step=step,
+            ),
+        ],
+        style=style,
+    )
+
+
 app.layout = html.Div(
     children=[
         html.Label("Option Option"),
@@ -118,19 +141,45 @@ app.layout = html.Div(
             ],
             value="Call",
         ),
-        html.Label("Get stock"),
-        dcc.Input(value="TICKER", type="text", id="input_ticker"),
-        html.Label("Price of stock"),
-        dcc.Input(type="number", value=0, step=0.01, id="input_price"),
-        html.Label("Avg Price paid (Covered Calls only)"),
-        dcc.Input(type="number", id="input_avg_price"),
-        html.Label("Strike"),
-        dcc.Input(type="number", step=0.5, id="input_Strike"),
-        html.Label("Premium"),
-        dcc.Input(type="number", step=0.01, id="input_premium"),
-        # html.Button('Submit', id='button_submit'),
-        html.Label("# of contracts"),
-        dcc.Input(type="number", id="input_number_of_contracts"),
+        html_div(
+            id="input_ticker",
+            label_name="Get Stock",
+            default_val="TICKER",
+            val_type="text",
+        ),
+        html_div(
+            id="input_price",
+            label_name="Price of stock",
+            default_val=0,
+            val_type="number",
+            step=0.01,
+        ),
+        html_div(
+            id="input_avg_price",
+            label_name="Avg Price paid (Covered Calls only)",
+            default_val=0,
+            val_type="number",
+        ),
+        html_div(
+            id="input_Strike",
+            label_name="Get Strike",
+            default_val=0,
+            val_type="number",
+            step=0.5,
+        ),
+        html_div(
+            id="input_premium",
+            label_name="Premium",
+            default_val=0,
+            val_type="number",
+            step=0.01,
+        ),
+        html_div(
+            id="input_number_of_contracts",
+            label_name="# of contracts",
+            default_val=0,
+            val_type="number",
+        ),
         html.Div(id="output_return"),
         html.Div(id="output_payoff"),
         dcc.Graph(id="Option_graph", figure=fig),
@@ -231,19 +280,21 @@ def get_price(input_ticker):
 
     return price
 
-@app.callback(
-    Output(component_id="table", component_property="data"),
-    Input(component_id="option_option", component_property="value"),
-    Input(component_id="input_Strike", component_property="value"),
-    Input(component_id="input_premium", component_property="value"),
-    Input(component_id="input_avg_price", component_property="value"),
-    Input(component_id="input_price", component_property="value"),
-)
-def update_table(
-    option_option, input_Strike, input_premium, input_avg_price, input_price
-):
-    pass
-    return None
+
+# @app.callback(
+#     Output(component_id="table", component_property="data"),
+#     Input(component_id="option_option", component_property="value"),
+#     Input(component_id="input_Strike", component_property="value"),
+#     Input(component_id="input_premium", component_property="value"),
+#     Input(component_id="input_avg_price", component_property="value"),
+#     Input(component_id="input_price", component_property="value"),
+# )
+# def update_table(
+#     option_option, input_Strike, input_premium, input_avg_price, input_price
+# ):
+#     pass
+#     return None
+
 
 if __name__ == "__main__":
     app.run_server(debug=True)
