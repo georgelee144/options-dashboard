@@ -6,15 +6,14 @@ import numpy as np
 import decimal
 
 import dash
-import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
+import dash_table
 
 import plotly.express as px
 import plotly.graph_objects as go
 
 from dash.dependencies import Input, Output
-
 
 tiingo_api_key = os.getenv("TIINGO_API_KEY")
 
@@ -41,7 +40,7 @@ def float_range(stop, step):
 def intialize_df_x(strike_price):
 
     df = pd.DataFrame(
-        columns=["x"], data=float_range(stop=strike_price * 20, step=0.01)
+        columns=["x"], data=float_range(stop=strike_price + 20, step=0.01)
     )
 
     return df
@@ -79,9 +78,17 @@ def return_covered_call_array(strike_price, premium, avg_price):
 
 def return_put_array(strike_price, premium):
 
-    df = pd.DataFrame(
-        columns=["x"], data=float_range(stop=strike_price * 20, step=0.01)
+    df = intialize_df_x(strike_price)
+    df["y"] = df["x"].apply(
+        lambda x: strike_price - x - premium if x < strike_price else 0 - premium
     )
+
+    return df
+
+
+def return_covered_cash_covered_put_array(strike_price, premium):
+
+    df = intialize_df_x(strike_price)
     df["y"] = df["x"].apply(
         lambda x: strike_price - x - premium if x < strike_price else 0 - premium
     )
@@ -91,11 +98,7 @@ def return_put_array(strike_price, premium):
 
 app = dash.Dash(__name__)
 
-# assume you have a "long-form" data frame
-# see https://plotly.com/python/px-arguments/ for more options
-
 df = pd.DataFrame(data={"x": [1, 2], "y": [1, 2]})
-
 
 fig = px.line(df, x="x", y="y")
 
@@ -118,14 +121,24 @@ app.layout = html.Div(
         html.Label("Get stock"),
         dcc.Input(value="TICKER", type="text", id="input_ticker"),
         html.Label("Price of stock"),
-        dcc.Input(type="number", id="input_price", value=0),
+        dcc.Input(type="number", value=0, step=0.01, id="input_price"),
         html.Label("Avg Price paid (Covered Calls only)"),
         dcc.Input(type="number", id="input_avg_price"),
         html.Label("Strike"),
-        dcc.Input(type="number", id="input_Strike"),
+        dcc.Input(type="number", step=0.5, id="input_Strike"),
         html.Label("Premium"),
-        dcc.Input(type="number", id="input_premium"),
+        dcc.Input(type="number", step=0.01, id="input_premium"),
+        # html.Button('Submit', id='button_submit'),
+        html.Label("# of contracts"),
+        dcc.Input(type="number", id="input_number_of_contracts"),
+        html.Div(id="output_return"),
+        html.Div(id="output_payoff"),
         dcc.Graph(id="Option_graph", figure=fig),
+        dash_table.DataTable(
+            id="table",
+            columns=[{"name": i, "id": i} for i in df.columns],
+            data=df.to_dict("records"),
+        ),
     ]
 )
 
@@ -144,8 +157,6 @@ def update_graph(
 
     fig = go.Figure()
 
-    df = pd.DataFrame(data={"x": [0, 1, 2], "y": [0, 1, 2]})
-
     if option_option == "call":
         df = return_call_array(input_Strike, input_premium)
         fig.add_trace(
@@ -154,11 +165,29 @@ def update_graph(
 
     elif option_option == "put":
         df = return_put_array(input_Strike, input_premium)
-        fig.add_trace(go.Scatter(x=df["x"], y=df["y"], name="Put"))
+        fig.add_trace(
+            go.Scatter(x=df["x"], y=df["y"], text=f"$ {input_price}", name="Put")
+        )
 
     elif option_option == "covered_call":
         df = return_covered_call_array(input_Strike, input_premium, input_avg_price)
-        fig.add_trace(go.Scatter(x=df["x"], y=df["y"], name="Covered Call"))
+        fig.add_trace(
+            go.Scatter(
+                x=df["x"], y=df["y"], text=f"$ {input_price}", name="Covered Call"
+            )
+        )
+
+    elif option_option == "cash_covered_put":
+        df = return_covered_cash_covered_put_array(input_Strike, input_premium)
+        fig.add_trace(
+            go.Scatter(
+                x=df["x"], y=df["y"], text=f"$ {input_price}", name="Cash Covered Put"
+            )
+        )
+
+    else:
+
+        df = pd.DataFrame(data={"x": [0, 1, 2], "y": [0, 1, 2]})
 
     fig.add_trace(
         go.Scatter(
@@ -202,6 +231,19 @@ def get_price(input_ticker):
 
     return price
 
+@app.callback(
+    Output(component_id="table", component_property="data"),
+    Input(component_id="option_option", component_property="value"),
+    Input(component_id="input_Strike", component_property="value"),
+    Input(component_id="input_premium", component_property="value"),
+    Input(component_id="input_avg_price", component_property="value"),
+    Input(component_id="input_price", component_property="value"),
+)
+def update_table(
+    option_option, input_Strike, input_premium, input_avg_price, input_price
+):
+    pass
+    return None
 
 if __name__ == "__main__":
     app.run_server(debug=True)
