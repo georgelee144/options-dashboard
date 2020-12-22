@@ -6,6 +6,7 @@ import numpy as np
 import decimal
 
 import dash
+import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
@@ -96,7 +97,7 @@ def return_covered_cash_covered_put_array(strike_price, premium):
     return df
 
 
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
 
 df = pd.DataFrame(data={"x": [1, 2], "y": [1, 2]})
 
@@ -112,12 +113,18 @@ def html_div(
     val_type,
     id,
     step="any",
-    style={"display": "inline-block", "flex-wrap": "wrap"},
+    style={
+        "display": "inline-block",
+        "flex-wrap": "wrap",
+        "padding-right": "30px",
+        "padding-bottom": "20px",
+        "padding-top": "20px",
+    },
 ):
     return html.Div(
         [
             html.Label(label_name),
-            dcc.Input(
+            dbc.Input(
                 value=default_val,
                 type=val_type,
                 id=id,
@@ -188,9 +195,17 @@ app.layout = html.Div(
             columns=[{"name": i, "id": i} for i in df.columns],
             data=df.to_dict("records"),
         ),
-    ]
+    ],
+    className="dash-bootstrap",
 )
 
+layout = {
+    "paper_bgcolor": "#222",
+    "plot_bgcolor": "#222",
+    "titlefont": {"color": "#FFF"},
+    "xaxis": {"tickfont": {"color": "#FFF"}},
+    "yaxis": {"tickfont": {"color": "#FFF"}},
+}
 
 @app.callback(
     Output(component_id="Option_graph", component_property="figure"),
@@ -204,7 +219,7 @@ def update_graph(
     option_option, input_Strike, input_premium, input_avg_price, input_price
 ):
 
-    fig = go.Figure()
+    fig = go.Figure(layout=layout)
 
     if option_option == "call":
         df = return_call_array(input_Strike, input_premium)
@@ -281,19 +296,19 @@ def get_price(input_ticker):
     return price
 
 
-# @app.callback(
-#     Output(component_id="table", component_property="data"),
-#     Input(component_id="option_option", component_property="value"),
-#     Input(component_id="input_Strike", component_property="value"),
-#     Input(component_id="input_premium", component_property="value"),
-#     Input(component_id="input_avg_price", component_property="value"),
-#     Input(component_id="input_price", component_property="value"),
-# )
-# def update_table(
-#     option_option, input_Strike, input_premium, input_avg_price, input_price
-# ):
-#     pass
-#     return None
+@app.callback(
+    Output(component_id="table", component_property="data"),
+    Input(component_id="option_option", component_property="value"),
+    Input(component_id="input_Strike", component_property="value"),
+    Input(component_id="input_premium", component_property="value"),
+    Input(component_id="input_avg_price", component_property="value"),
+    Input(component_id="input_price", component_property="value"),
+)
+def update_table(
+    option_option, input_Strike, input_premium, input_avg_price, input_price
+):
+    pass
+    return None
 
 
 if __name__ == "__main__":
