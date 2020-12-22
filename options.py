@@ -125,7 +125,6 @@ app.layout = html.Div(
         dcc.Input(type="number", id="input_Strike"),
         html.Label("Premium"),
         dcc.Input(type="number", id="input_premium"),
-        html.Button("Submit", id="button_submit"),
         dcc.Graph(id="Option_graph", figure=fig),
     ]
 )
@@ -192,7 +191,7 @@ def update_graph(
     Output(component_id="input_price", component_property="value"),
     Input(component_id="input_ticker", component_property="value"),
 )
-def update_graph(input_ticker):
+def get_price(input_ticker):
 
     try:
         price = get_price_from_tiingo(input_ticker)
