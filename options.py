@@ -5,6 +5,15 @@ import pandas as pd
 import numpy as np
 import decimal
 
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+import dash_table
+
+import plotly.express as px
+import plotly.graph_objects as go
+
+from dash.dependencies import Input, Output
 
 tiingo_api_key = os.getenv("TIINGO_API_KEY")
 
@@ -85,17 +94,6 @@ def return_covered_cash_covered_put_array(strike_price, premium):
     )
 
     return df
-
-
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
-import dash_table
-
-import plotly.express as px
-import plotly.graph_objects as go
-
-from dash.dependencies import Input, Output
 
 
 app = dash.Dash(__name__)
@@ -222,7 +220,7 @@ def update_graph(
     Output(component_id="input_price", component_property="value"),
     Input(component_id="input_ticker", component_property="value"),
 )
-def update_graph(input_ticker):
+def update_price(input_ticker):
 
     try:
         price = get_price_from_tiingo(input_ticker)
