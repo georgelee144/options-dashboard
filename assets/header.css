@@ -1,0 +1,10 @@
+.dash-bootstrap .Select-menu-outer {
+  border-bottom-right-radius: 0.25rem;
+  border-bottom-left-radius: 0.25rem;
+  background-color: #222;
+  background-clip: padding-box;
+  border: 1px solid #fff;
+  border-top-color: transparent;
+  box-shadow: none;
+  color: #fff;
+}
