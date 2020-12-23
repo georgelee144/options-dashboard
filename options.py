@@ -1,18 +1,16 @@
-import requests
-import os
 import datetime
-import pandas as pd
-import numpy as np
 import decimal
+import os
 
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
-
+import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-
+import requests
 from dash.dependencies import Input, Output
 
 tiingo_api_key = os.getenv("TIINGO_API_KEY")
@@ -21,10 +19,11 @@ tiingo_api_key = os.getenv("TIINGO_API_KEY")
 def get_price_from_tiingo(ticker):
     headers = {"Content-Type": "application/json"}
     requestResponse = requests.get(
-        f"https://api.tiingo.com/tiingo/daily/{ticker}/prices?startDate={datetime.date.today()-datetime.timedelta(days=5)}&endDate={datetime.date.today()}&token={tiingo_api_key}&columns=close",
+        f"https://api.tiingo.com/tiingo/daily/{ticker}/prices?startDate=" +
+        f"{datetime.date.today()-datetime.timedelta(days=5)}&endDate=" +
+        f"{datetime.date.today()}&token={tiingo_api_key}&columns=close",
         headers=headers,
     )
-
     return requestResponse.json()[0]["close"]
 
 
