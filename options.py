@@ -1,6 +1,7 @@
 import datetime
 import decimal
 import os
+from enum import Enum, auto
 
 import dash
 import dash_bootstrap_components as dbc
@@ -13,97 +14,71 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 from dash.dependencies import Input, Output
+from options_math import (
+    return_call_array,
+    return_covered_call_array,
+    return_covered_cash_covered_put_array,
+    return_put_array,
+)
 
 tiingo_api_key = os.getenv("TIINGO_API_KEY")
+if tiingo_api_key == None:
+    raise EnvironmentError(
+        """Missing TIINGO_API_KEY, please set this environment variable."""
+    )
 
 
-def get_price_from_tiingo(ticker):
+class OPTIONS(Enum):
+    CALL = auto()
+    COVERED_CALL = auto()
+    PUT = auto()
+    CASH_COVERED_PUT = auto()
+
+
+def get_price(ticker: str) -> float:
     headers = {"Content-Type": "application/json"}
     requestResponse = requests.get(
-        f"https://api.tiingo.com/tiingo/daily/{ticker}/prices?startDate=" +
-        f"{datetime.date.today()-datetime.timedelta(days=5)}&endDate=" +
-        f"{datetime.date.today()}&token={tiingo_api_key}&columns=close",
+        f"""https://api.tiingo.com/tiingo/daily/{ticker}/prices?startDate=\
+        {datetime.date.today()-datetime.timedelta(days=5)}&endDate=\
+        {datetime.date.today()}&token={tiingo_api_key}&columns=close""",
         headers=headers,
     )
-    return requestResponse.json()[0]["close"]
+    # Getting most recent value, index 0
+    most_recent_close_price = requestResponse.json()[0]["close"]
+    return most_recent_close_price
 
 
-def float_range(stop, step):
-
-    start = 0
-
-    while start < stop:
-        yield float(start)
-        start += decimal.Decimal(step)
-
-
-def intialize_df_x(strike_price):
-
-    df = pd.DataFrame(
-        columns=["x"], data=float_range(stop=strike_price + 20, step=0.01)
+def get_company_name(ticker: str) -> str:
+    headers = {"Content-Type": "application/json"}
+    requestResponse = requests.get(
+        f"https://api.tiingo.com/tiingo/daily/{ticker}?token={tiingo_api_key}",
+        headers=headers,
     )
-
-    return df
-
-
-def return_array(strike_price):
-
-    df = intialize_df_x(strike_price)
-    df["y"] = df["x"].apply(lambda x: x - strike_price if x > strike_price else 0)
-
-    return df
-
-
-def return_call_array(strike_price, premium):
-
-    df = intialize_df_x(strike_price)
-    df["y"] = df["x"].apply(
-        lambda x: x - strike_price - premium if x > strike_price else 0 - premium
-    )
-
-    return df
-
-
-def return_covered_call_array(strike_price, premium, avg_price):
-
-    df = intialize_df_x(strike_price)
-    df["y"] = df["x"].apply(
-        lambda x: strike_price - avg_price + premium
-        if x >= strike_price
-        else x - avg_price + premium
-    )
-
-    return df
-
-
-def return_put_array(strike_price, premium):
-
-    df = intialize_df_x(strike_price)
-    df["y"] = df["x"].apply(
-        lambda x: strike_price - x - premium if x < strike_price else 0 - premium
-    )
-
-    return df
-
-
-def return_covered_cash_covered_put_array(strike_price, premium):
-
-    df = intialize_df_x(strike_price)
-    df["y"] = df["x"].apply(
-        lambda x: strike_price - x - premium if x < strike_price else 0 - premium
-    )
-
-    return df
+    return requestResponse.json()["name"]
 
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
 
-df = pd.DataFrame(data={"x": [1, 2], "y": [1, 2]})
-
-fig = px.line(df, x="x", y="y")
-
-fig.update_xaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
-fig.update_yaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
+fig = go.Figure(
+    go.Indicator(
+        mode="gauge+number+delta",
+        domain={"x": [0, 1], "y": [0, 1]},
+        gauge={
+            "shape": "bullet",
+            "axis": {
+                "range": [0, 100],
+                "tickwidth": 1,
+                "tickcolor": "darkblue",
+            },
+            "bgcolor": "black",
+            "bordercolor": "white",
+            "steps": [
+                {"range": [0, 50], "color": "#B22222"},
+                {"range": [50, 100], "color": "#006400"},
+            ],
+        },
+    )
+)
 
 
 def html_div(
@@ -111,6 +86,7 @@ def html_div(
     default_val,
     val_type,
     id,
+    pattern,
     step="any",
     style={
         "display": "inline-block",
@@ -128,6 +104,7 @@ def html_div(
                 type=val_type,
                 id=id,
                 step=step,
+                pattern=pattern,
             ),
         ],
         style=style,
@@ -138,20 +115,24 @@ app.layout = html.Div(
     children=[
         html.Label("Option Option"),
         dcc.Dropdown(
-            id="option_option",
+            id="input_option_type",
             options=[
-                {"label": "Call", "value": "call"},
-                {"label": "Covered Call", "value": "covered_call"},
-                {"label": "Put", "value": "put"},
-                {"label": "Cash Covered Put", "value": "cash_covered_put"},
+                {"label": "Call", "value": OPTIONS.CALL.value},
+                {"label": "Covered Call", "value": OPTIONS.COVERED_CALL.value},
+                {"label": "Put", "value": OPTIONS.PUT.value},
+                {
+                    "label": "Cash Covered Put",
+                    "value": OPTIONS.CASH_COVERED_PUT.value,
+                },
             ],
-            value="Call",
+            value=OPTIONS.CALL.value,
         ),
         html_div(
             id="input_ticker",
-            label_name="Get Stock",
-            default_val="TICKER",
+            label_name="Stock Ticker",
+            default_val="",
             val_type="text",
+            pattern="^[a-zA-Z]{0,4}",
         ),
         html_div(
             id="input_price",
@@ -159,19 +140,22 @@ app.layout = html.Div(
             default_val=0,
             val_type="number",
             step=0.01,
+            pattern="^[0-9]*\.?[0-9]+$",
         ),
         html_div(
-            id="input_avg_price",
-            label_name="Avg Price paid (Covered Calls only)",
+            id="input_average_price_paid",
+            label_name="Average Price Paid (Covered Calls only)",
             default_val=0,
             val_type="number",
+            pattern="^[0-9]*\.?[0-9]+$",
         ),
         html_div(
-            id="input_Strike",
+            id="input_strike",
             label_name="Get Strike",
             default_val=0,
             val_type="number",
             step=0.5,
+            pattern="^[0-9]*\.?[0-9]+$",
         ),
         html_div(
             id="input_premium",
@@ -179,101 +163,89 @@ app.layout = html.Div(
             default_val=0,
             val_type="number",
             step=0.01,
+            pattern="^[0-9]*\.?[0-9]+$",
         ),
         html_div(
             id="input_number_of_contracts",
-            label_name="# of contracts",
-            default_val=0,
+            label_name="#s of Contracts",
+            default_val=1,
             val_type="number",
+            pattern="^[0-9]*$",
         ),
         html.Div(id="output_return"),
         html.Div(id="output_payoff"),
-        dcc.Graph(id="Option_graph", figure=fig),
-        dash_table.DataTable(
-            id="table",
-            columns=[{"name": i, "id": i} for i in df.columns],
-            data=df.to_dict("records"),
-        ),
+        html.Div(dcc.Graph(id="output_graph", figure=fig)),
+        dash_table.DataTable(id="output_table"),
     ],
     className="dash-bootstrap",
 )
 
-layout = {
-    "paper_bgcolor": "#222",
-    "plot_bgcolor": "#222",
-    "titlefont": {"color": "#FFF"},
-    "xaxis": {"tickfont": {"color": "#FFF"}},
-    "yaxis": {"tickfont": {"color": "#FFF"}},
-}
+layout = {}
+
 
 @app.callback(
-    Output(component_id="Option_graph", component_property="figure"),
-    Input(component_id="option_option", component_property="value"),
-    Input(component_id="input_Strike", component_property="value"),
+    Output(component_id="output_graph", component_property="figure"),
+    Input(component_id="input_option_type", component_property="value"),
+    Input(component_id="input_strike", component_property="value"),
     Input(component_id="input_premium", component_property="value"),
-    Input(component_id="input_avg_price", component_property="value"),
+    Input(component_id="input_average_price_paid", component_property="value"),
     Input(component_id="input_price", component_property="value"),
+    Input(component_id="input_number_of_contracts", component_property="value"),
 )
 def update_graph(
-    option_option, input_Strike, input_premium, input_avg_price, input_price
+    input_option_type,
+    input_strike,
+    input_premium,
+    input_average_price_paid,
+    input_price,
+    input_number_of_contracts,
 ):
+    if input_number_of_contracts == None:
+        input_number_of_contracts = 1
+    stock_count = input_number_of_contracts * 100
 
-    fig = go.Figure(layout=layout)
-
-    if option_option == "call":
-        df = return_call_array(input_Strike, input_premium)
-        fig.add_trace(
-            go.Scatter(x=df["x"], y=df["y"], text=f"$ {input_price}", name="Call")
+    # Create dataframe and update the dataframe inputs using inputs
+    df = None
+    if input_option_type == OPTIONS.CALL.value:
+        df = return_call_array(input_strike, input_premium, stock_count)
+    elif input_option_type == OPTIONS.PUT.value:
+        df = return_put_array(input_strike, input_premium, stock_count)
+    elif input_option_type == OPTIONS.COVERED_CALL.value:
+        df = return_covered_call_array(
+            input_strike,
+            input_premium,
+            stock_count,
+            input_average_price_paid,
+        )
+    elif input_option_type == OPTIONS.CASH_COVERED_PUT.value:
+        df = return_covered_cash_covered_put_array(
+            input_strike, input_premium, stock_count
         )
 
-    elif option_option == "put":
-        df = return_put_array(input_Strike, input_premium)
-        fig.add_trace(
-            go.Scatter(x=df["x"], y=df["y"], text=f"$ {input_price}", name="Put")
+    fig = go.Figure(
+        go.Indicator(
+            mode="gauge+number+delta",
+            domain={"x": [0, 1], "y": [0, 1]},
+            gauge={
+                "shape": "bullet",
+                "axis": {
+                    "range": [0, 100],
+                    "tickwidth": 1,
+                    "tickcolor": "darkblue",
+                },
+                "bgcolor": "black",
+                "bordercolor": "white",
+                "steps": [
+                    {"range": [0, 50], "color": "#B22222"},
+                    {"range": [50, 100], "color": "#006400"},
+                ],
+                "threshold": {
+                    "line": {"color": "black", "width": 2},
+                    "thickness": 0.75,
+                    "value": input_price,
+                },
+            },
         )
-
-    elif option_option == "covered_call":
-        df = return_covered_call_array(input_Strike, input_premium, input_avg_price)
-        fig.add_trace(
-            go.Scatter(
-                x=df["x"], y=df["y"], text=f"$ {input_price}", name="Covered Call"
-            )
-        )
-
-    elif option_option == "cash_covered_put":
-        df = return_covered_cash_covered_put_array(input_Strike, input_premium)
-        fig.add_trace(
-            go.Scatter(
-                x=df["x"], y=df["y"], text=f"$ {input_price}", name="Cash Covered Put"
-            )
-        )
-
-    else:
-
-        df = pd.DataFrame(data={"x": [0, 1, 2], "y": [0, 1, 2]})
-
-    fig.add_trace(
-        go.Scatter(
-            x=[input_price],
-            y=df.loc[df["x"] == input_price]["y"],
-            mode="markers",
-            marker={"size": 10},
-            text=f"$ {input_price}",
-            name="You are here",
-        )
-    )
-
-    fig.update_xaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
-    fig.update_yaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
-
-    y_axis_min = df["y"].min() - 1
-
-    if y_axis_min > 0:
-        y_axis_min = -1
-
-    fig.update_layout(
-        xaxis_range=[df["x"].min(), df["x"].max()],
-        yaxis_range=[y_axis_min, df["y"].max() + 1],
     )
 
     return fig
@@ -283,31 +255,58 @@ def update_graph(
     Output(component_id="input_price", component_property="value"),
     Input(component_id="input_ticker", component_property="value"),
 )
-def get_price(input_ticker):
-
+def update_price(input_ticker):
+    layout["title"] = {"text": input_ticker}
     try:
-        price = get_price_from_tiingo(input_ticker)
-
-    except Exception as e:
-        print(e)
+        price = get_price(input_ticker)
+        layout["title"] = {"text": get_company_name(input_ticker)}
+    except:
         price = 0
-
     return price
 
 
 @app.callback(
-    Output(component_id="table", component_property="data"),
-    Input(component_id="option_option", component_property="value"),
-    Input(component_id="input_Strike", component_property="value"),
+    Output(component_id="output_table", component_property="data"),
+    Input(component_id="input_option_type", component_property="value"),
+    Input(component_id="input_strike", component_property="value"),
     Input(component_id="input_premium", component_property="value"),
-    Input(component_id="input_avg_price", component_property="value"),
+    Input(component_id="input_average_price_paid", component_property="value"),
     Input(component_id="input_price", component_property="value"),
+    Input(component_id="input_number_of_contracts", component_property="value"),
 )
 def update_table(
-    option_option, input_Strike, input_premium, input_avg_price, input_price
+    input_option_type,
+    input_strike,
+    input_premium,
+    input_average_price_paid,
+    input_price,
+    input_number_of_contracts,
 ):
-    pass
-    return None
+    if input_number_of_contracts == None:
+        input_number_of_contracts = 1
+    if input_option_type == OPTIONS.CALL.value:
+        df = return_call_array(
+            input_strike, input_premium, input_number_of_contracts
+        )
+    elif input_option_type == OPTIONS.PUT.value:
+        df = return_put_array(
+            input_strike, input_premium, input_number_of_contracts
+        )
+    elif input_option_type == OPTIONS.COVERED_CALL.value:
+        df = return_covered_call_array(
+            input_strike,
+            input_premium,
+            input_number_of_contracts,
+            input_average_price_paid,
+        )
+    elif input_option_type == OPTIONS.CASH_COVERED_PUT.value:
+        df = return_covered_cash_covered_put_array(
+            input_strike, input_premium, input_number_of_contracts
+        )
+    else:
+        df = pd.DataFrame({"Price": []})
+
+    return df.to_dict("records")
 
 
 if __name__ == "__main__":
