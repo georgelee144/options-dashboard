@@ -1,7 +1,8 @@
 import datetime
 import decimal
 import os
-from enum import Enum, auto
+from enum import Enum
+import math
 
 import dash
 import dash_bootstrap_components as dbc
@@ -14,6 +15,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import requests
 from dash.dependencies import Input, Output
+from plotly.subplots import make_subplots
+
 from options_math import (
     return_call_array,
     return_covered_call_array,
@@ -29,10 +32,10 @@ if tiingo_api_key == None:
 
 
 class OPTIONS(Enum):
-    CALL = auto()
-    COVERED_CALL = auto()
-    PUT = auto()
-    CASH_COVERED_PUT = auto()
+    CALL = "Call"
+    COVERED_CALL = "Covered Call"
+    PUT = "Put"
+    CASH_COVERED_PUT = "Cash Covered Put"
 
 
 def get_price(ticker: str) -> float:
@@ -59,26 +62,12 @@ def get_company_name(ticker: str) -> str:
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
 
-fig = go.Figure(
-    go.Indicator(
-        mode="gauge+number+delta",
-        domain={"x": [0, 1], "y": [0, 1]},
-        gauge={
-            "shape": "bullet",
-            "axis": {
-                "range": [0, 100],
-                "tickwidth": 1,
-                "tickcolor": "darkblue",
-            },
-            "bgcolor": "black",
-            "bordercolor": "white",
-            "steps": [
-                {"range": [0, 50], "color": "#B22222"},
-                {"range": [50, 100], "color": "#006400"},
-            ],
-        },
-    )
-)
+df = pd.DataFrame(data={"Stock Price": [1, 2], "Profit": [1, 2]})
+
+fig = px.line(df, x="Stock Price", y="Profit")
+
+fig.update_xaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
+fig.update_yaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
 
 
 def html_div(
@@ -111,76 +100,148 @@ def html_div(
     )
 
 
+tabular_view = [
+    dcc.Tab(label=l, value=l,)
+    for l in [
+        OPTIONS.CALL.value,
+        OPTIONS.COVERED_CALL.value,
+        OPTIONS.PUT.value,
+        OPTIONS.CASH_COVERED_PUT.value,
+    ]
+]
+
+
 app.layout = html.Div(
-    children=[
-        html.Label("Option Option"),
-        dcc.Dropdown(
+    [
+        dcc.Tabs(
             id="input_option_type",
-            options=[
-                {"label": "Call", "value": OPTIONS.CALL.value},
-                {"label": "Covered Call", "value": OPTIONS.COVERED_CALL.value},
-                {"label": "Put", "value": OPTIONS.PUT.value},
-                {
-                    "label": "Cash Covered Put",
-                    "value": OPTIONS.CASH_COVERED_PUT.value,
-                },
-            ],
             value=OPTIONS.CALL.value,
+            children=tabular_view,
+            colors={
+                "border": "black",
+                "primary": "navy",
+                "background": "black",
+            },
         ),
-        html_div(
-            id="input_ticker",
-            label_name="Stock Ticker",
-            default_val="",
-            val_type="text",
-            pattern="^[a-zA-Z]{0,4}",
+        html.Div(
+            id="content",
+            children=[
+                html_div(
+                    id="input_ticker",
+                    label_name="Stock Ticker",
+                    default_val="",
+                    val_type="text",
+                    pattern="^[a-zA-Z]{0,4}",
+                ),
+                html_div(
+                    id="input_price",
+                    label_name="Price of stock",
+                    default_val=0,
+                    val_type="number",
+                    step=0.01,
+                    pattern=r"^[0-9]*\.?[0-9]+$",
+                ),
+                html_div(
+                    id="input_average_price_paid",
+                    label_name="Average Price Paid (Covered Calls only)",
+                    default_val=0,
+                    val_type="number",
+                    pattern=r"^[0-9]*\.?[0-9]+$",
+                ),
+                html_div(
+                    id="input_strike",
+                    label_name="Get Strike",
+                    default_val=0,
+                    val_type="number",
+                    step=0.5,
+                    pattern=r"^[0-9]*\.?[0-9]+$",
+                ),
+                html_div(
+                    id="input_premium",
+                    label_name="Premium",
+                    default_val=0,
+                    val_type="number",
+                    step=0.01,
+                    pattern=r"^[0-9]*\.?[0-9]+$",
+                ),
+                html_div(
+                    id="input_number_of_contracts",
+                    label_name="#s of Contracts",
+                    default_val=1,
+                    val_type="number",
+                    pattern="^[0-9]*$",
+                ),
+                html.Div(id="output_return"),
+                html.Div(id="output_payoff"),
+                html.Div(dcc.Graph(id="output_graph", figure=fig)),
+                dash_table.DataTable(id="output_table"),
+            ],
         ),
-        html_div(
-            id="input_price",
-            label_name="Price of stock",
-            default_val=0,
-            val_type="number",
-            step=0.01,
-            pattern="^[0-9]*\.?[0-9]+$",
-        ),
-        html_div(
-            id="input_average_price_paid",
-            label_name="Average Price Paid (Covered Calls only)",
-            default_val=0,
-            val_type="number",
-            pattern="^[0-9]*\.?[0-9]+$",
-        ),
-        html_div(
-            id="input_strike",
-            label_name="Get Strike",
-            default_val=0,
-            val_type="number",
-            step=0.5,
-            pattern="^[0-9]*\.?[0-9]+$",
-        ),
-        html_div(
-            id="input_premium",
-            label_name="Premium",
-            default_val=0,
-            val_type="number",
-            step=0.01,
-            pattern="^[0-9]*\.?[0-9]+$",
-        ),
-        html_div(
-            id="input_number_of_contracts",
-            label_name="#s of Contracts",
-            default_val=1,
-            val_type="number",
-            pattern="^[0-9]*$",
-        ),
-        html.Div(id="output_return"),
-        html.Div(id="output_payoff"),
-        html.Div(dcc.Graph(id="output_graph", figure=fig)),
-        dash_table.DataTable(id="output_table"),
     ],
     className="dash-bootstrap",
 )
 
 layout = {}
+
+
+@app.callback(
+    Output("content", "children"), Input("input_option_type", "value")
+)
+def render_content(tab):
+
+    return html.Div(
+        children=[
+            html_div(
+                id="input_ticker",
+                label_name="Stock Ticker",
+                default_val="",
+                val_type="text",
+                pattern="^[a-zA-Z]{0,4}",
+            ),
+            html_div(
+                id="input_price",
+                label_name="Price of stock",
+                default_val=0,
+                val_type="number",
+                step=0.01,
+                pattern=r"^[0-9]*\.?[0-9]+$",
+            ),
+            html_div(
+                id="input_average_price_paid",
+                label_name="Average Price Paid (Covered Calls only)",
+                default_val=0,
+                val_type="number",
+                pattern=r"^[0-9]*\.?[0-9]+$",
+            ),
+            html_div(
+                id="input_strike",
+                label_name="Get Strike",
+                default_val=0,
+                val_type="number",
+                step=0.5,
+                pattern=r"^[0-9]*\.?[0-9]+$",
+            ),
+            html_div(
+                id="input_premium",
+                label_name="Premium",
+                default_val=0,
+                val_type="number",
+                step=0.01,
+                pattern=r"^[0-9]*\.?[0-9]+$",
+            ),
+            html_div(
+                id="input_number_of_contracts",
+                label_name="#s of Contracts",
+                default_val=1,
+                val_type="number",
+                pattern="^[0-9]*$",
+            ),
+            html.Div(id="output_return"),
+            html.Div(id="output_payoff"),
+            html.Div(dcc.Graph(id="output_graph", figure=fig)),
+            dash_table.DataTable(id="output_table"),
+        ]
+    )
 
 
 @app.callback(
@@ -205,6 +266,7 @@ def update_graph(
     stock_count = input_number_of_contracts * 100
 
     # Create dataframe and update the dataframe inputs using inputs
+    fig = go.Figure()
     df = None
     if input_option_type == OPTIONS.CALL.value:
         df = return_call_array(input_strike, input_premium, stock_count)
@@ -212,40 +274,39 @@ def update_graph(
         df = return_put_array(input_strike, input_premium, stock_count)
     elif input_option_type == OPTIONS.COVERED_CALL.value:
         df = return_covered_call_array(
-            input_strike,
-            input_premium,
-            stock_count,
-            input_average_price_paid,
+            input_strike, input_premium, stock_count, input_average_price_paid,
         )
     elif input_option_type == OPTIONS.CASH_COVERED_PUT.value:
         df = return_covered_cash_covered_put_array(
             input_strike, input_premium, stock_count
         )
-
-    fig = go.Figure(
-        go.Indicator(
-            mode="gauge+number+delta",
-            domain={"x": [0, 1], "y": [0, 1]},
-            gauge={
-                "shape": "bullet",
-                "axis": {
-                    "range": [0, 100],
-                    "tickwidth": 1,
-                    "tickcolor": "darkblue",
-                },
-                "bgcolor": "black",
-                "bordercolor": "white",
-                "steps": [
-                    {"range": [0, 50], "color": "#B22222"},
-                    {"range": [50, 100], "color": "#006400"},
-                ],
-                "threshold": {
-                    "line": {"color": "black", "width": 2},
-                    "thickness": 0.75,
-                    "value": input_price,
-                },
-            },
+    fig.add_trace(
+        go.Scatter(
+            x=df["Stock Price"], y=df["Profit"], name="Stock Price vs. Profit"
         )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[input_price],
+            y=df.loc[df["Stock Price"] == input_price]["Profit"],
+            mode="markers",
+            marker={"size": 10},
+            text=f"$ {input_price}",
+            name="Break-even",
+        )
+    )
+
+    fig.update_xaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
+    fig.update_yaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
+
+    y_axis_min = df["Profit"].min() - 1
+
+    if y_axis_min > 0:
+        y_axis_min = -1
+
+    fig.update_layout(
+        xaxis_range=[df["Stock Price"].min(), df["Stock Price"].max()],
+        yaxis_range=[y_axis_min, df["Profit"].max() + 1],
     )
 
     return fig
@@ -253,6 +314,7 @@ def update_graph(
 
 @app.callback(
     Output(component_id="input_price", component_property="value"),
+    Output(component_id="input_strike", component_property="value"),
     Input(component_id="input_ticker", component_property="value"),
 )
 def update_price(input_ticker):
@@ -262,7 +324,7 @@ def update_price(input_ticker):
         layout["title"] = {"text": get_company_name(input_ticker)}
     except:
         price = 0
-    return price
+    return price, round(price * 2) / 2
 
 
 @app.callback(
@@ -311,3 +373,4 @@ def update_table(
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+
