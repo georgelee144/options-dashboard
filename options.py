@@ -3,6 +3,7 @@ import decimal
 import os
 from enum import Enum
 import math
+from itertools import chain
 
 import dash
 import dash_bootstrap_components as dbc
@@ -14,7 +15,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import requests
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 from plotly.subplots import make_subplots
 
 from options_math import (
@@ -29,6 +30,14 @@ if tiingo_api_key == None:
     raise EnvironmentError(
         """Missing TIINGO_API_KEY, please set this environment variable."""
     )
+
+DEFAULT_STYLE = {
+    "display": "inline-block",
+    "flex-wrap": "wrap",
+    "padding-right": "30px",
+    "padding-bottom": "20px",
+    "padding-top": "20px",
+}
 
 
 class OPTIONS(Enum):
@@ -92,24 +101,18 @@ def html_div(
     label_name,
     default_val,
     val_type,
-    id,
+    id_val,
     pattern,
     step="any",
-    style={
-        "display": "inline-block",
-        "flex-wrap": "wrap",
-        "padding-right": "30px",
-        "padding-bottom": "20px",
-        "padding-top": "20px",
-    },
+    style=DEFAULT_STYLE,
 ):
     return html.Div(
         [
-            html.Label(label_name),
+            html.Label(label_name, id="label_" + id_val),
             dbc.Input(
                 value=default_val,
                 type=val_type,
-                id=id,
+                id="input_" + id_val,
                 step=step,
                 pattern=pattern,
             ),
@@ -145,14 +148,14 @@ app.layout = html.Div(
             id="content",
             children=[
                 html_div(
-                    id="input_ticker",
+                    id_val="ticker",
                     label_name="Stock Ticker",
                     default_val="",
                     val_type="text",
                     pattern="^[a-zA-Z]{0,4}",
                 ),
                 html_div(
-                    id="input_price",
+                    id_val="price",
                     label_name="Price of stock",
                     default_val=0,
                     val_type="number",
@@ -160,14 +163,14 @@ app.layout = html.Div(
                     pattern=r"^[0-9]*\.?[0-9]+$",
                 ),
                 html_div(
-                    id="input_average_price_paid",
+                    id_val="average_price_paid",
                     label_name="Average Price Paid (Covered Calls only)",
                     default_val=0,
                     val_type="number",
                     pattern=r"^[0-9]*\.?[0-9]+$",
                 ),
                 html_div(
-                    id="input_strike",
+                    id_val="strike",
                     label_name="Get Strike",
                     default_val=0,
                     val_type="number",
@@ -175,7 +178,7 @@ app.layout = html.Div(
                     pattern=r"^[0-9]*\.?[0-9]+$",
                 ),
                 html_div(
-                    id="input_premium",
+                    id_val="premium",
                     label_name="Premium",
                     default_val=0,
                     val_type="number",
@@ -183,7 +186,7 @@ app.layout = html.Div(
                     pattern=r"^[0-9]*\.?[0-9]+$",
                 ),
                 html_div(
-                    id="input_number_of_contracts",
+                    id_val="number_of_contracts",
                     label_name="#s of Contracts",
                     default_val=1,
                     val_type="number",
@@ -200,63 +203,15 @@ app.layout = html.Div(
 )
 
 @app.callback(
-    Output("content", "children"), Input("input_option_type", "value")
+    Output("input_average_price_paid", "style"),
+    Output("label_average_price_paid", "style"),
+    Input("input_option_type", "value"),
 )
 def render_content(tab):
-
-    return html.Div(
-        children=[
-            html_div(
-                id="input_ticker",
-                label_name="Stock Ticker",
-                default_val="",
-                val_type="text",
-                pattern="^[a-zA-Z]{0,4}",
-            ),
-            html_div(
-                id="input_price",
-                label_name="Price of stock",
-                default_val=0,
-                val_type="number",
-                step=0.01,
-                pattern=r"^[0-9]*\.?[0-9]+$",
-            ),
-            html_div(
-                id="input_average_price_paid",
-                label_name="Average Price Paid (Covered Calls only)",
-                default_val=0,
-                val_type="number",
-                pattern=r"^[0-9]*\.?[0-9]+$",
-            ),
-            html_div(
-                id="input_strike",
-                label_name="Get Strike",
-                default_val=0,
-                val_type="number",
-                step=0.5,
-                pattern=r"^[0-9]*\.?[0-9]+$",
-            ),
-            html_div(
-                id="input_premium",
-                label_name="Premium",
-                default_val=0,
-                val_type="number",
-                step=0.01,
-                pattern=r"^[0-9]*\.?[0-9]+$",
-            ),
-            html_div(
-                id="input_number_of_contracts",
-                label_name="#s of Contracts",
-                default_val=1,
-                val_type="number",
-                pattern="^[0-9]*$",
-            ),
-            html.Div(id="output_return"),
-            html.Div(id="output_payoff"),
-            html.Div(dcc.Graph(id="output_graph", figure=fig)),
-            dash_table.DataTable(id="output_table"),
-        ]
-    )
+    if tab == "Covered Call":
+        return DEFAULT_STYLE, {"display": "inline-block"}
+    else:
+        return {"display": "none"}, {"display": "none"}
 
 
 @app.callback(
@@ -343,7 +298,7 @@ def update_price(input_ticker):
         layout["title"] = {"text": get_company_name(input_ticker)}
     except:
         price = 0
-    return price, round(price * 2) / 2
+    return price, math.ceil(price * 2) / 2
 
 
 @app.callback(
