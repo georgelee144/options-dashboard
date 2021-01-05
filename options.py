@@ -68,12 +68,22 @@ def get_company_name(ticker: str) -> str:
     )
     return requestResponse.json()["name"]
 
+
 layout = {
     "paper_bgcolor": "#222",
     "plot_bgcolor": "#222",
     "titlefont": {"color": "#FFF"},
     "xaxis": {"tickfont": {"color": "#FFF"}},
     "yaxis": {"tickfont": {"color": "#FFF"}},
+    "showlegend": True,
+    "hovermode": "x unified",
+    "font_color": "white",
+    "hoverlabel": dict(
+        font_size=16,
+        font_family="Rockwell",
+        font_color="white",
+        bgcolor="black",
+    ),
 }
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
@@ -91,11 +101,12 @@ fig.update_layout(
     xaxis_range=[df["Stock Price"].min(), df["Stock Price"].max()],
     yaxis_range=[y_axis_min, df["Profit"].max() + 1],
     xaxis_title="Stock Price",
-    yaxis_title="Profit"
+    yaxis_title="Profit",
 )
 
 fig.update_xaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
 fig.update_yaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
+
 
 def html_div(
     label_name,
@@ -122,7 +133,10 @@ def html_div(
 
 
 tabular_view = [
-    dcc.Tab(label=l, value=l,)
+    dcc.Tab(
+        label=l,
+        value=l,
+    )
     for l in [
         OPTIONS.CALL.value,
         OPTIONS.COVERED_CALL.value,
@@ -202,6 +216,7 @@ app.layout = html.Div(
     className="dash-bootstrap",
 )
 
+
 @app.callback(
     Output("input_average_price_paid", "style"),
     Output("label_average_price_paid", "style"),
@@ -244,7 +259,10 @@ def update_graph(
         df = return_put_array(input_strike, input_premium, stock_count)
     elif input_option_type == OPTIONS.COVERED_CALL.value:
         df = return_covered_call_array(
-            input_strike, input_premium, stock_count, input_average_price_paid,
+            input_strike,
+            input_premium,
+            stock_count,
+            input_average_price_paid,
         )
     elif input_option_type == OPTIONS.CASH_COVERED_PUT.value:
         df = return_covered_cash_covered_put_array(
@@ -253,17 +271,6 @@ def update_graph(
     fig.add_trace(
         go.Scatter(
             x=df["Stock Price"], y=df["Profit"], name="Stock Price vs. Profit"
-        )
-    )
-    fig.add_trace(
-        
-        go.Scatter(
-            x=[input_price],
-            y=df.loc[df["Stock Price"] == input_price]["Profit"],
-            mode="markers",
-            marker={"size": 10},
-            text=f"$ {input_price}",
-            name="Break-even",
         )
     )
 
@@ -280,7 +287,7 @@ def update_graph(
         xaxis_range=[df["Stock Price"].min(), df["Stock Price"].max()],
         yaxis_range=[y_axis_min, df["Profit"].max() + 1],
         xaxis_title="Stock Price",
-        yaxis_title="Profit"
+        yaxis_title="Profit",
     )
 
     return fig
@@ -347,4 +354,3 @@ def update_table(
 
 if __name__ == "__main__":
     app.run_server(debug=True)
-
