@@ -1,6 +1,7 @@
 import pandas as pd
 import decimal
 
+
 def float_range(stop, step):
 
     start = 0
@@ -30,24 +31,15 @@ def return_array(strike_price):
     return df
 
 
-def return_total_profit(df, number_of_contracts):
-
-    df["Total Profit"] = df["Profit"] * number_of_contracts
-
-    return df
-
-
 def return_call_array(strike_price, premium, number_of_contracts):
 
     df = intialize_df_x(strike_price)
     df["Profit"] = df["Stock Price"].apply(
-        lambda x: x - strike_price - premium
-        if x > strike_price
-        else 0 - premium
+        lambda x: max(x - strike_price, 0) - premium
     )
-    df = return_total_profit(df, number_of_contracts)
+    df["Total Profit"] = df["Profit"] * number_of_contracts
 
-    df['Return'] = df["Profit"]/premium
+    df["Return"] = df["Profit"] / premium
 
     return df
 
@@ -58,13 +50,11 @@ def return_covered_call_array(
 
     df = intialize_df_x(strike_price)
     df["Profit"] = df["Stock Price"].apply(
-        lambda x: strike_price - avg_price + premium
-        if x >= strike_price
-        else x - avg_price + premium
+        lambda x: max(strike_price, x) - avg_price + premium
     )
-    df = return_total_profit(df, number_of_contracts)
+    df["Total Profit"] = df["Profit"] * number_of_contracts
 
-    df['Return'] = df["Profit"]/(avg_price+strike_price)
+    df["Return"] = df["Profit"] / (avg_price + strike_price)
 
     return df
 
@@ -73,14 +63,12 @@ def return_put_array(strike_price, premium, number_of_contracts):
 
     df = intialize_df_x(strike_price)
     df["Profit"] = df["Stock Price"].apply(
-        lambda x: strike_price - x - premium
-        if x < strike_price
-        else 0 - premium
+        lambda x: max(strike_price - x, 0) - premium
     )
 
-    df = return_total_profit(df, number_of_contracts)
+    df["Total Profit"] = df["Profit"] * number_of_contracts
 
-    df['Return'] = df["Profit"]/(strike_price)
+    df["Return"] = df["Profit"] / (strike_price)
 
     return df
 
@@ -91,11 +79,9 @@ def return_covered_cash_covered_put_array(
 
     df = intialize_df_x(strike_price)
     df["Profit"] = df["Stock Price"].apply(
-        lambda x: strike_price - x - premium
-        if x < strike_price
-        else 0 - premium
+        lambda x: max(strike_price - x, 0) - premium
     )
 
-    df = return_total_profit(df, number_of_contracts)
+    df["Total Profit"] = df["Profit"] * number_of_contracts
 
     return df
