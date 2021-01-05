@@ -59,16 +59,34 @@ def get_company_name(ticker: str) -> str:
     )
     return requestResponse.json()["name"]
 
+layout = {
+    "paper_bgcolor": "#222",
+    "plot_bgcolor": "#222",
+    "titlefont": {"color": "#FFF"},
+    "xaxis": {"tickfont": {"color": "#FFF"}},
+    "yaxis": {"tickfont": {"color": "#FFF"}},
+}
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
 
 df = pd.DataFrame(data={"Stock Price": [1, 2], "Profit": [1, 2]})
 
-fig = px.line(df, x="Stock Price", y="Profit")
+fig = go.Figure(layout=layout)
+
+y_axis_min = df["Profit"].min() - 1
+if y_axis_min > 0:
+    y_axis_min = -1
+
+# Adds range and titles
+fig.update_layout(
+    xaxis_range=[df["Stock Price"].min(), df["Stock Price"].max()],
+    yaxis_range=[y_axis_min, df["Profit"].max() + 1],
+    xaxis_title="Stock Price",
+    yaxis_title="Profit"
+)
 
 fig.update_xaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
 fig.update_yaxes(zeroline=True, zerolinewidth=2, zerolinecolor="black")
-
 
 def html_div(
     label_name,
@@ -181,9 +199,6 @@ app.layout = html.Div(
     className="dash-bootstrap",
 )
 
-layout = {}
-
-
 @app.callback(
     Output("content", "children"), Input("input_option_type", "value")
 )
@@ -266,7 +281,7 @@ def update_graph(
     stock_count = input_number_of_contracts * 100
 
     # Create dataframe and update the dataframe inputs using inputs
-    fig = go.Figure()
+    fig = go.Figure(layout=layout)
     df = None
     if input_option_type == OPTIONS.CALL.value:
         df = return_call_array(input_strike, input_premium, stock_count)
@@ -286,6 +301,7 @@ def update_graph(
         )
     )
     fig.add_trace(
+        
         go.Scatter(
             x=[input_price],
             y=df.loc[df["Stock Price"] == input_price]["Profit"],
@@ -304,9 +320,12 @@ def update_graph(
     if y_axis_min > 0:
         y_axis_min = -1
 
+    # Adds range and titles
     fig.update_layout(
         xaxis_range=[df["Stock Price"].min(), df["Stock Price"].max()],
         yaxis_range=[y_axis_min, df["Profit"].max() + 1],
+        xaxis_title="Stock Price",
+        yaxis_title="Profit"
     )
 
     return fig
