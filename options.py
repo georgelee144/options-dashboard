@@ -166,7 +166,7 @@ app.layout = html.Div(
                     label_name="Stock Ticker",
                     default_val="",
                     val_type="text",
-                    pattern="^[a-zA-Z]{0,4}",
+                    pattern=r"^[a-zA-Z-.]{0,5}",
                 ),
                 html_div(
                     id_val="price",
